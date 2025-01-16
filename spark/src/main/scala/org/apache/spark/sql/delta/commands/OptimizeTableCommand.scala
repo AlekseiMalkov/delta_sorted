@@ -521,6 +521,17 @@ class OptimizeExecutor(
       }
     }
 
+    val conf = sparkSession.sessionState.conf
+    val sort = conf.getConf(DeltaSQLConf.MDC_SORT_WITHIN_PARTITIONS)
+    val field = conf.getConf(DeltaSQLConf.MDC_SORT_WITHIN_PARTITIONS_FIELD)
+
+    val optionallySortedDf = if (sort) {
+      repartitionDF.sortWithinPartitions(field)
+    }
+    else {
+      repartitionDF
+    }
+
     val partitionDesc = partition.toSeq.map(entry => entry._1 + "=" + entry._2).mkString(",")
 
     val partitionName = if (partition.isEmpty) "" else s" in partition ($partitionDesc)"
@@ -530,7 +541,7 @@ class OptimizeExecutor(
       description)
 
     val binInfo = optimizeStrategy.initNewBin
-    val addFiles = txn.writeFiles(repartitionDF, None, isOptimize = true, Nil).collect {
+    val addFiles = txn.writeFiles(optionallySortedDf, None, isOptimize = true, Nil).collect {
       case a: AddFile => optimizeStrategy.tagAddFile(a, binInfo)
       case other =>
         throw new IllegalStateException(

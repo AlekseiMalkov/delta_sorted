@@ -518,17 +518,20 @@ class OptimizeExecutor(
     } else {
       val useRepartition = sparkSession.sessionState.conf.getConf(
         DeltaSQLConf.DELTA_OPTIMIZE_REPARTITION_ENABLED)
-        val dfPartitionUnsorted = if (useRepartition) {
-          input.repartition(numPartitions = 1)
-        } else {
-          input.coalesce(numPartitions = 1)
-        }
-        val optionallySortedDf = if (sort) {
-          dfPartitionUnsorted.sortWithinPartitions(field)
-        }
-        else {
-          dfPartitionUnsorted
-        }
+
+      val dfPartitionUnsorted = if (useRepartition) {
+        input.repartition(numPartitions = 1)
+      } else {
+        input.coalesce(numPartitions = 1)
+      }
+      
+      // return df with sorting if needed
+      if (sort) {
+        dfPartitionUnsorted.sortWithinPartitions(field)
+      }
+      else {
+        dfPartitionUnsorted
+      }
     }
 
     val partitionDesc = partition.toSeq.map(entry => entry._1 + "=" + entry._2).mkString(",")
@@ -540,7 +543,7 @@ class OptimizeExecutor(
       description)
 
     val binInfo = optimizeStrategy.initNewBin
-    val addFiles = txn.writeFiles(optionallySortedDf, None, isOptimize = true, Nil).collect {
+    val addFiles = txn.writeFiles(repartitionDF, None, isOptimize = true, Nil).collect {
       case a: AddFile => optimizeStrategy.tagAddFile(a, binInfo)
       case other =>
         throw new IllegalStateException(

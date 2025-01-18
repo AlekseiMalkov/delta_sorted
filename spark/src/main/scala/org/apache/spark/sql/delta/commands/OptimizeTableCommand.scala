@@ -501,6 +501,10 @@ class OptimizeExecutor(
       maxFileSize: Long): Seq[FileAction] = {
     val baseTablePath = txn.deltaLog.dataPath
 
+    val conf = sparkSession.sessionState.conf
+    val sort = conf.getConf(DeltaSQLConf.MDC_SORT_WITHIN_PARTITIONS)
+    val field = conf.getConf(DeltaSQLConf.MDC_SORT_WITHIN_PARTITIONS_FIELD)
+
     var input = txn.deltaLog.createDataFrame(txn.snapshot, bin, actionTypeOpt = Some("Optimize"))
     input = RowTracking.preserveRowTrackingColumns(input, txn.snapshot)
     val repartitionDF = if (isMultiDimClustering) {
@@ -514,22 +518,17 @@ class OptimizeExecutor(
     } else {
       val useRepartition = sparkSession.sessionState.conf.getConf(
         DeltaSQLConf.DELTA_OPTIMIZE_REPARTITION_ENABLED)
-      if (useRepartition) {
-        input.repartition(numPartitions = 1)
-      } else {
-        input.coalesce(numPartitions = 1)
-      }
-    }
-
-    val conf = sparkSession.sessionState.conf
-    val sort = conf.getConf(DeltaSQLConf.MDC_SORT_WITHIN_PARTITIONS)
-    val field = conf.getConf(DeltaSQLConf.MDC_SORT_WITHIN_PARTITIONS_FIELD)
-
-    val optionallySortedDf = if (sort) {
-      repartitionDF.sortWithinPartitions(field)
-    }
-    else {
-      repartitionDF
+        val dfPartitionUnsorted = if (useRepartition) {
+          input.repartition(numPartitions = 1)
+        } else {
+          input.coalesce(numPartitions = 1)
+        }
+        val optionallySortedDf = if (sort) {
+          dfPartitionUnsorted.sortWithinPartitions(field)
+        }
+        else {
+          dfPartitionUnsorted
+        }
     }
 
     val partitionDesc = partition.toSeq.map(entry => entry._1 + "=" + entry._2).mkString(",")

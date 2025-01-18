@@ -1425,7 +1425,7 @@ trait DeltaSQLConfBase {
         "on the columns we are z-ordering on.")
       .booleanConf
       .createWithDefault(true)
-      
+
   val MDC_SORT_WITHIN_PARTITIONS =
     SQLConf.buildConf("spark.databricks.io.skipping.mdc.sortWithinPartitions")
       .internal()
@@ -1441,7 +1441,7 @@ trait DeltaSQLConfBase {
          "This co-locates records with the same Z-order values in row groups, " +
          "which enables data skipping on the Parquet level.")
       .stringConf
-      .createWithDefault("fingerprint")      
+      .createWithDefault("fingerprint")
 
   val FAST_INTERLEAVE_BITS_ENABLED =
     buildConf("optimize.zorder.fastInterleaveBits.enabled")
